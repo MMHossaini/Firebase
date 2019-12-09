@@ -1,17 +1,46 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-
-    // This rule allows anyone on the internet to view, edit, and delete
-    // all data in your Firestore database. It is useful for getting
-    // started, but it is configured to expire after 30 days because it
-    // leaves your app open to attackers. At that time, all client
-    // requests to your Firestore database will be denied.
-    //
-    // Make sure to write security rules for your app before that time, or else
-    // your app will lose access to your Firestore database
-    match /{document=**} {
-      allow read, write: if request.time < timestamp.date(2019, 12, 4);
+    // True if the user is signed in or the requested data is 'public'
+    function signedInOrPublic() {
+      return request.auth.uid != null || resource.data.visibility == 'public';
     }
+
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // A read rule can be divided into get and list rules
+    match /users/{document=**} {
+      // Applies to single document read requests
+      allow get: if request.auth.uid != null;
+
+      // Applies to queries and collection read requests
+      allow list: if request.auth.uid != null;
+    }
+
+    // A write rule can be divided into create, update, and delete rules
+    match /users/{document=**} {
+      // Applies to writes to nonexistent documents
+      allow create: if request.auth.uid != null;
+
+      // Applies to writes to existing documents
+      allow update: if request.auth.uid != null;
+
+      // Applies to delete operations
+      allow delete: if request.auth.uid != null;
+    }
+
+    // Allow the user to read data if the document has the 'visibility'
+    // field set to 'public'
+    match /cities/{city} {
+      allow read: if resource.data.visibility == 'public';
+    }  
   }
+
+
+  // Allow only authenticated content owners access
+    match /some_collection/{document} {
+      allow read, write: if request.auth.uid == request.resource.data.author_uid
+    }
 }
